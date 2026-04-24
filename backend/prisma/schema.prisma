@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// ======================
+/// USERS & AUTH
+/// ======================
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(STAFF)
+  isActive  Boolean   @default(true) @map("is_active")
+  phone     String?
+  avatar    String?
+  lastLogin DateTime? @map("last_login")
+
+  sales         Sale[]
+  audits        AuditLog[]
+  refreshTokens RefreshToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+model BlacklistedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("blacklisted_tokens")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+/// ======================
+/// PRODUCTS
+/// ======================
+model Product {
+  id          String  @id @default(uuid())
+  name        String
+  sku         String  @unique
+  barcode     String? @unique
+  price       Float
+  description String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  stock         Stock[]
+  movements     StockMovement[]
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+
+  image         String?
+  minStockLevel Int     @default(10) @map("min_stock_level")
+  unit          String? @default("pcs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// ======================
+/// CATEGORY
+/// ======================
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  @db.Text
+  slug        String?  @unique
+  image       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+}
+
+/// ======================
+/// WAREHOUSE
+/// ======================
+model Warehouse {
+  id            String  @id @default(uuid())
+  name          String
+  code          String? @unique
+  location      String?
+  address       String? @db.Text
+  contactPerson String? @map("contact_person")
+  phone         String?
+
+  isActive Boolean @default(true) @map("is_active")
+
+  capacity    Int?
+  minStock    Int?    @map("min_stock")
+  maxStock    Int?    @map("max_stock")
+  description String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stockItems Stock[]
+  movements  StockMovement[]
+
+  @@map("warehouses")
+}
+
+model StockMovement {
+  id String @id @default(uuid())
+
+  warehouseId String @map("warehouse_id")
+  productId   String @map("product_id")
+
+  type     StockMovementType
+  quantity Int
+
+  reason String? // "purchase", "sale", "adjustment", "damage"
+
+  createdBy String?  @map("created_by") // userId
+  createdAt DateTime @default(now()) @map("created_at")
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+  TRANSFER
+}
+
+/// ======================
+/// STOCK (Inventory per warehouse)
+/// ======================
+model Stock {
+  id       String @id @default(uuid())
+  quantity Int
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  warehouseId String    @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  minStock Int? @default(5) @map("min_stock")
+  maxStock Int? @default(100) @map("max_stock")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, warehouseId])
+  @@map("stocks")
+}
+
+/// ======================
+/// SUPPLIERS
+/// ======================
+model Supplier {
+  id      String  @id @default(uuid())
+  name    String
+  email   String?
+  phone   String?
+  address String? @db.Text
+  contact String?
+
+  purchases Purchase[]
+}
+
+/// ======================
+/// PURCHASE (Stock IN)
+/// ======================
+model Purchase {
+  id     String         @id @default(uuid())
+  status PurchaseStatus @default(PENDING)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  items PurchaseItem[]
+
+  createdAt DateTime @default(now())
+}
+
+model PurchaseItem {
+  id       String @id @default(uuid())
+  quantity Int
+  price    Float
+
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+enum PurchaseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// ======================
+/// CUSTOMERS
+/// ======================
+model Customer {
+  id      String  @id @default(uuid())
+  name    String
+  email   String?
+  phone   String?
+  address String? @db.Text
+  contact String?
+
+  sales Sale[]
+}
+
+/// ======================
+/// SALES (Stock OUT)
+/// ======================
+model Sale {
+  id          String @id @default(uuid())
+  totalAmount Float
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  items SaleItem[]
+
+  createdAt DateTime @default(now())
+}
+
+model SaleItem {
+  id       String @id @default(uuid())
+  quantity Int
+  price    Float
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+/// ======================
+/// AUDIT LOG (IMPORTANT for IT Audit role 🔥)
+/// ======================
+model AuditLog {
+  id String @id @default(uuid())
+
+  action   String
+  oldValue String?
+  newValue String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
