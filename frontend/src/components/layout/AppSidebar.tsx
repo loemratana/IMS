@@ -11,6 +11,7 @@ import {
   BarChart3,
   Sparkles,
   Layers,
+  Truck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ const inventory = [
   { title: "Categories", url: "/categories", icon: Layers },
   { title: "Warehouses", url: "/warehouses", icon: Warehouse },
   { title: "Inventory", url: "/inventory", icon: Boxes },
+  { title: "Transfers", url: "/inventory/transfers", icon: Truck },
 ];
 
 const operations = [

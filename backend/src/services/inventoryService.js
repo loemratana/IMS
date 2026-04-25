@@ -361,6 +361,8 @@ class InventoryService {
         }
     }
 
+
+
     getStockStatus(quantity, minStock) {
         if (quantity === 0) return 'OUT_OF_STOCK';
         if (quantity <= minStock) return 'LOW_STOCK';

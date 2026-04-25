@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const productRoutes = require("./routes/productRoutes");
 const warehouseRoutes = require("./routes/warehouseRoutes");
+const transferRoutes = require("./routes/transferRoutes");
 
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const app = express();
@@ -39,7 +40,7 @@ app.get("/health", (req, res) => {
 })
 
 
-app.use(express.json()); // ✅ REQUIRED
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", authRoutes);
@@ -52,5 +53,7 @@ app.use("/api/warehouses", warehouseRoutes);
 app.use("/warehouses", warehouseRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/inventory", inventoryRoutes);
+app.use("/api/transfers", transferRoutes);
+app.use("/transfers", transferRoutes);
 
 module.exports = app;

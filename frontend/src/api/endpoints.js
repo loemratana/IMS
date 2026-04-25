@@ -27,4 +27,11 @@ export const API_ENDPOINTS = {
     TRANSFER: '/inventory/transfer',
     CURRENT_STOCK: '/inventory/current-stock',
   },
+  TRANSFERS: {
+    REQUESTS: '/transfers/requests',
+    BY_ID: (id) => `/transfers/requests/${id}`,
+    APPROVE: (id) => `/transfers/requests/${id}/approve`,
+    EXECUTE: (id) => `/transfers/requests/${id}/execute`,
+    CANCEL: (id) => `/transfers/requests/${id}/cancel`,
+  },
 };

@@ -4,6 +4,10 @@ const logger = require('../utils/logger');
 class CategoryController {
     constructor() {
         this.categoryService = categoryService;
+        this.createCategory = this.createCategory.bind(this);
+        this.updateCategory = this.updateCategory.bind(this);
+        this.deleteCategory = this.deleteCategory.bind(this);
+        this.getAllCategories = this.getAllCategories.bind(this);
     }
 
     //create new category controller 

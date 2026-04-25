@@ -10,12 +10,14 @@ import { Card } from "@/components/ui/card";
 import { Plus, Download } from 'lucide-react';
 import { toast } from "sonner";
 import inventoryService from '@/services/inventoryService';
+import { CreateTransferModal } from './transfers/CreateTransferModal';
 
 const InventoryPage = () => {
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionType, setActionType] = useState<'IN' | 'OUT' | 'ADJUST' | 'TRANSFER' | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     page: 1,
     limit: 10,
@@ -35,9 +37,14 @@ const InventoryPage = () => {
   };
 
   const handleAction = (type: 'IN' | 'OUT' | 'ADJUST' | 'TRANSFER', item: any | null = null) => {
-    if (item) setSelectedItem(item);
+    setSelectedItem(item);
     setActionType(type);
-    setIsDialogOpen(true);
+
+    if (type === 'TRANSFER') {
+      setIsTransferModalOpen(true);
+    } else {
+      setIsDialogOpen(true);
+    }
   };
 
   const handleSubmitAction = async (formData: any) => {
@@ -119,6 +126,15 @@ const InventoryPage = () => {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSubmit={handleSubmitAction}
+      />
+
+      <CreateTransferModal
+        open={isTransferModalOpen}
+        onOpenChange={setIsTransferModalOpen}
+        initialData={selectedItem ? {
+          productId: selectedItem.productId || selectedItem.product?.id || selectedItem.id,
+          sourceWarehouseId: selectedItem.warehouseId || selectedItem.warehouse?.id
+        } : undefined}
       />
     </div>
   );

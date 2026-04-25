@@ -60,7 +60,7 @@ const WarehouseDetailDrawer: React.FC<WarehouseDetailDrawerProps> = ({
                      <div className="grid grid-cols-1 gap-4">
                         <Card className="border-border/50 shadow-none bg-muted/10">
                            <CardContent className="p-4 space-y-4">
-                              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
+                              <h4 className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground flex items-center">
                                  <MapPin className="h-3 w-3 mr-2 text-indigo-500" /> Location Details
                               </h4>
                               <div className="space-y-2">
@@ -73,7 +73,7 @@ const WarehouseDetailDrawer: React.FC<WarehouseDetailDrawerProps> = ({
 
                         <Card className="border-border/50 shadow-none bg-muted/10">
                            <CardContent className="p-4 space-y-4">
-                              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
+                              <h4 className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground flex items-center">
                                  <User className="h-3 w-3 mr-2 text-indigo-500" /> Contact Representative
                               </h4>
                               <div className="grid grid-cols-1 gap-3">

@@ -2,6 +2,20 @@ const authService = require('../services/authService');
 const logger = require('../utils/logger');
 
 class AuthController {
+  constructor() {
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+    this.refreshToken = this.refreshToken.bind(this);
+    this.logout = this.logout.bind(this);
+    this.getMe = this.getMe.bind(this);
+    this.changePassword = this.changePassword.bind(this);
+    this.forgotPassword = this.forgotPassword.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
+    this.verifyEmail = this.verifyEmail.bind(this);
+    this.resendVerification = this.resendVerification.bind(this);
+    this.handleError = this.handleError.bind(this);
+  }
+
   /**
    * Register new user
    */

@@ -18,6 +18,7 @@ import Categories from "./pages/Categories";
 import Profile from "./pages/Profile";
 import Products from "./pages/products/index";
 import Inventory from "./pages/inventory/index";
+import Transfers from "./pages/inventory/transfers/index";
 import Warehouses from "./pages/warehouses/index";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/products" element={<Products />} />
             <Route path="/warehouses" element={<Warehouses />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/inventory/transfers" element={<Transfers />} />
             <Route path="/purchases" element={<PagePlaceholder title="Purchases" description="Create and approve purchase orders." />} />
             <Route path="/sales" element={<PagePlaceholder title="Sales" description="Sales orders and customer transactions." />} />
             <Route path="/contacts" element={<PagePlaceholder title="Suppliers & Customers" description="Manage your supplier and customer directory." />} />

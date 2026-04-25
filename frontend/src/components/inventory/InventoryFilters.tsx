@@ -11,7 +11,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Search, Filter, RotateCcw } from 'lucide-react';
 
-const InventoryFilters: React.FC = () => {
+interface InventoryFiltersProps {
+  onFilterChange: (filters: any) => void;
+}
+
+const InventoryFilters: React.FC<InventoryFiltersProps> = ({ onFilterChange }) => {
+  const [search, setSearch] = React.useState('');
+  const [status, setStatus] = React.useState('all');
+  const [category, setCategory] = React.useState('all');
+  const [warehouse, setWarehouse] = React.useState('all');
+
+  const updateFilters = (updates: any) => {
+    const newFilters = { search, status, category, warehouse, ...updates };
+    onFilterChange(newFilters);
+  };
+
+  const handleReset = () => {
+    setSearch('');
+    setStatus('all');
+    setCategory('all');
+    setWarehouse('all');
+    onFilterChange({ search: '', status: 'all', category: 'all', warehouse: 'all' });
+  };
+
   return (
     <div className="p-4 border-b dark:border-border/10 bg-muted/5 transition-colors">
       <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -20,11 +42,16 @@ const InventoryFilters: React.FC = () => {
           <Input 
             placeholder="Search by Product Name or SKU..." 
             className="pl-9 bg-muted/20 dark:bg-muted/10 border-border/40 focus:border-primary/50 transition-all shadow-none"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              updateFilters({ search: e.target.value });
+            }}
           />
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:flex lg:items-center">
-          <Select>
+          <Select value={status} onValueChange={(val) => { setStatus(val); updateFilters({ status: val }); }}>
             <SelectTrigger className="w-full lg:w-[140px] bg-background border-input shadow-sm">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -36,7 +63,7 @@ const InventoryFilters: React.FC = () => {
             </SelectContent>
           </Select>
 
-          <Select>
+          <Select value={category} onValueChange={(val) => { setCategory(val); updateFilters({ category: val }); }}>
             <SelectTrigger className="w-full lg:w-[160px] bg-background border-input shadow-sm">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -48,7 +75,7 @@ const InventoryFilters: React.FC = () => {
             </SelectContent>
           </Select>
 
-          <Select>
+          <Select value={warehouse} onValueChange={(val) => { setWarehouse(val); updateFilters({ warehouse: val }); }}>
             <SelectTrigger className="w-full lg:w-[160px] bg-background border-input shadow-sm">
               <SelectValue placeholder="Warehouse" />
             </SelectTrigger>
@@ -60,7 +87,11 @@ const InventoryFilters: React.FC = () => {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" className="lg:w-auto gap-2 border-border/50 dark:bg-muted/10 shadow-none text-muted-foreground hover:text-foreground transition-colors">
+          <Button 
+            variant="outline" 
+            onClick={handleReset}
+            className="lg:w-auto gap-2 border-border/50 dark:bg-muted/10 shadow-none text-muted-foreground hover:text-foreground transition-colors"
+          >
             <RotateCcw className="h-4 w-4" />
             Reset
           </Button>

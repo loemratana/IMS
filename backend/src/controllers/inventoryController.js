@@ -1,5 +1,12 @@
 const inventoryService = require('../services/inventoryService');
 class InventoryController {
+    constructor() {
+        this.stockIn = this.stockIn.bind(this);
+        this.stockOut = this.stockOut.bind(this);
+        this.transferStock = this.transferStock.bind(this);
+        this.getCurrentStock = this.getCurrentStock.bind(this);
+        this.handleError = this.handleError.bind(this);
+    }
 
     async stockIn(req, res, next) {
         try {

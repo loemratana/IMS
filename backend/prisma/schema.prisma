@@ -26,6 +26,19 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Transfers
+  requestedTransfers     TransferRequest[]       @relation("TransferRequester")
+  approvedTransfers      TransferRequest[]       @relation("TransferApprover")
+  rejectedTransfers      TransferRequest[]       @relation("TransferRejecter")
+  executedTransfers      Transfer[]
+  transferHistoryRecords TransferHistoryRecord[]
+
+  // Stock Reservations
+  createdReservations  StockReservation[] @relation("Reservor")
+  releasedReservations StockReservation[] @relation("Releasor")
+  reservations         StockReservation[]
+  transferRequests     TransferRequest[]
 }
 
 model RefreshToken {
@@ -55,6 +68,34 @@ enum Role {
   STAFF
 }
 
+enum TransferStatus {
+  PENDING // Request created, waiting approval
+  APPROVED // Approved, ready for execution
+  REJECTED // Rejected by approver
+  CANCELLED // Cancelled by requester
+  EXECUTED // Transfer completed successfully
+}
+
+enum TransferExecutionStatus {
+  PENDING // Execution initiated but not completed
+  COMPLETED // Transfer fully executed
+  FAILED // Execution failed (will trigger rollback)
+}
+
+enum ReservationStatus {
+  RESERVED // Stock is reserved for this transfer
+  RELEASED // Reservation released (cancelled/rejected)
+  CONSUMED // Reservation consumed after successful transfer
+  EXPIRED // Reservation expired (timeout)
+}
+
+enum TransferPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 /// ======================
 /// PRODUCTS
 /// ======================
@@ -78,8 +119,11 @@ model Product {
   minStockLevel Int     @default(10) @map("min_stock_level")
   unit          String? @default("pcs")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  transferRequests  TransferRequest[]
+  transfers         Transfer[]
+  stockReservations StockReservation[]
 }
 
 /// ======================
@@ -123,6 +167,15 @@ model Warehouse {
   stockItems Stock[]
   movements  StockMovement[]
 
+  // Transfers
+  transferRequestsAsSource TransferRequest[] @relation("SourceWarehouse")
+  transferRequestsAsTarget TransferRequest[] @relation("TargetWarehouse")
+  transfersAsSource        Transfer[]        @relation("ExecSourceWarehouse")
+  transfersAsTarget        Transfer[]        @relation("ExecTargetWarehouse")
+
+  stockReservations StockReservation[]
+  transferRequests  TransferRequest[]
+
   @@map("warehouses")
 }
 
@@ -137,12 +190,21 @@ model StockMovement {
 
   reason String? // "purchase", "sale", "adjustment", "damage"
 
+  // Transfer reference (if movement is from transfer)
+  transferId String? @map("transfer_id")
+
+  // Stock levels before/after
+  quantityBefore Int? @map("quantity_before")
+  quantityAfter  Int? @map("quantity_after")
+
   createdBy String?  @map("created_by") // userId
   createdAt DateTime @default(now()) @map("created_at")
 
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   product   Product   @relation(fields: [productId], references: [id])
+  transfer  Transfer? @relation(fields: [transferId], references: [id])
 
+  @@index([transferId])
   @@map("stock_movements")
 }
 
@@ -156,9 +218,195 @@ enum StockMovementType {
 /// ======================
 /// STOCK (Inventory per warehouse)
 /// ======================
+model TransferRequest {
+  id            String @id @default(uuid())
+  requestNumber String @unique
+
+  sourceWarehouseId String @map("source_warehouse_id")
+  targetWarehouseId String @map("target_warehouse_id")
+  productId         String @map("product_id")
+  quantity          Int
+
+  reason   String?          @db.Text
+  priority TransferPriority @default(MEDIUM)
+
+  status TransferStatus @default(PENDING)
+
+  // Requestor info
+  requestedBy  String   @map("requested_by")
+  requestedAt  DateTime @default(now()) @map("requested_at")
+  requestNotes String?  @map("request_notes") @db.Text
+
+  // Approval info
+  approvedBy    String?   @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+  approvalNotes String?   @map("approval_notes") @db.Text
+
+  // Rejection info
+  rejectedBy      String?   @map("rejected_by")
+  rejectedAt      DateTime? @map("rejected_at")
+  rejectionReason String?   @map("rejection_reason") @db.Text
+
+  // Execution info
+  executedAt DateTime? @map("executed_at")
+
+  // Expected dates
+  expectedDeliveryDate DateTime? @map("expected_delivery_date")
+
+  notes String? @db.Text
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  sourceWarehouse Warehouse @relation("SourceWarehouse", fields: [sourceWarehouseId], references: [id])
+  targetWarehouse Warehouse @relation("TargetWarehouse", fields: [targetWarehouseId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+  requester       User      @relation("TransferRequester", fields: [requestedBy], references: [id])
+  approver        User?     @relation("TransferApprover", fields: [approvedBy], references: [id])
+  rejecter        User?     @relation("TransferRejecter", fields: [rejectedBy], references: [id])
+
+  // Child records
+  execution   Transfer? // One-to-one with Transfer
+  reservation StockReservation?
+  history     TransferHistoryRecord[]
+  user        User?                   @relation(fields: [userId], references: [id])
+  userId      String?
+  warehouse   Warehouse?              @relation(fields: [warehouseId], references: [id])
+  warehouseId String?
+
+  @@index([status])
+  @@index([requestNumber])
+  @@index([sourceWarehouseId])
+  @@index([targetWarehouseId])
+  @@index([requestedBy])
+  @@index([requestedAt])
+  @@map("transfer_requests")
+}
+
+model Transfer {
+  id             String @id @default(uuid())
+  transferNumber String @unique
+  requestId      String @unique @map("request_id")
+
+  sourceWarehouseId String @map("source_warehouse_id")
+  targetWarehouseId String @map("target_warehouse_id")
+  productId         String @map("product_id")
+  quantity          Int
+
+  status     TransferExecutionStatus @default(PENDING)
+  executedBy String                  @map("executed_by")
+  executedAt DateTime                @default(now()) @map("executed_at")
+
+  // Execution details
+  sourceStockBefore Int? @map("source_stock_before")
+  sourceStockAfter  Int? @map("source_stock_after")
+  targetStockBefore Int? @map("target_stock_before")
+  targetStockAfter  Int? @map("target_stock_after")
+
+  // Failure info
+  failureReason String? @map("failure_reason") @db.Text
+  retryCount    Int     @default(0) @map("retry_count")
+
+  // Metadata
+  metadata Json? // Additional execution data
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  request         TransferRequest @relation(fields: [requestId], references: [id])
+  sourceWarehouse Warehouse       @relation("ExecSourceWarehouse", fields: [sourceWarehouseId], references: [id])
+  targetWarehouse Warehouse       @relation("ExecTargetWarehouse", fields: [targetWarehouseId], references: [id])
+  product         Product         @relation(fields: [productId], references: [id])
+  executor        User            @relation(fields: [executedBy], references: [id])
+
+  // Stock movements
+  movements StockMovement[]
+
+  @@index([transferNumber])
+  @@index([requestId])
+  @@index([status])
+  @@map("transfers")
+}
+
+model StockReservation {
+  id                String @id @default(uuid())
+  reservationNumber String @unique @map("reservation_number")
+  transferRequestId String @unique @map("transfer_request_id")
+
+  warehouseId String @map("warehouse_id")
+  productId   String @map("product_id")
+  quantity    Int
+
+  status ReservationStatus @default(RESERVED)
+
+  // Reservation timing
+  reservedAt DateTime  @default(now()) @map("reserved_at")
+  expiresAt  DateTime? @map("expires_at") // Optional: auto-release after time
+  releasedAt DateTime? @map("released_at")
+  consumedAt DateTime? @map("consumed_at")
+
+  // Who performed the action
+  reservedBy String  @map("reserved_by")
+  releasedBy String? @map("released_by")
+
+  // Metadata
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  transferRequest TransferRequest @relation(fields: [transferRequestId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  product         Product         @relation(fields: [productId], references: [id])
+  reservor        User            @relation("Reservor", fields: [reservedBy], references: [id])
+  releasor        User?           @relation("Releasor", fields: [releasedBy], references: [id])
+  stock           Stock?          @relation(fields: [stockId], references: [id])
+  stockId         String?
+  user            User?           @relation(fields: [userId], references: [id])
+  userId          String?
+
+  @@index([transferRequestId])
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("stock_reservations")
+}
+
+model TransferHistoryRecord {
+  id                String @id @default(uuid())
+  transferRequestId String @map("transfer_request_id")
+
+  action     TransferAction
+  fromStatus TransferStatus?
+  toStatus   TransferStatus?
+
+  performedBy String   @map("performed_by")
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  notes    String? @db.Text
+  metadata Json? // Additional context like IP address, user agent
+
+  // Relationships
+  transferRequest TransferRequest @relation(fields: [transferRequestId], references: [id])
+  user            User            @relation(fields: [performedBy], references: [id])
+
+  @@index([transferRequestId])
+  @@index([performedAt])
+  @@index([action])
+  @@map("transfer_history_records")
+}
+
 model Stock {
   id       String @id @default(uuid())
   quantity Int
+
+  reservedQuantity  Int @default(0) @map("reserved_quantity")
+  availableQuantity Int @default(0) @map("available_quantity") // computed: quantity - reservedQuantity
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -166,10 +414,13 @@ model Stock {
   warehouseId String    @map("warehouse_id")
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
 
-  minStock Int? @default(5) @map("min_stock")
-  maxStock Int? @default(100) @map("max_stock")
+  minStock     Int? @default(5) @map("min_stock")
+  maxStock     Int? @default(100) @map("max_stock")
+  reorderPoint Int? @default(10) @map("reorder_point")
 
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  reservations StockReservation[]
 
   @@unique([productId, warehouseId])
   @@map("stocks")
@@ -280,4 +531,19 @@ model AuditLog {
   user   User   @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+enum TransferAction {
+  CREATED
+  UPDATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  RESERVATION_CREATED
+  RESERVATION_RELEASED
+  EXECUTION_STARTED
+  EXECUTION_COMPLETED
+  EXECUTION_FAILED
+  EXECUTION_RETRIED
 }

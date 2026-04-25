@@ -65,7 +65,7 @@ const InventoryKPIs: React.FC<KPIProps> = ({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
       {kpis.map((kpi, index) => (
-        <Card key={index} className="border-border/50 shadow-none bg-card transition-colors">
+        <Card key={index} className="border-border/50 shadow-none bg-card transition-colors transition-shadow">
           <CardContent className="p-4 flex items-center space-x-3">
             <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
               <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
