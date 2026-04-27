@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
   INVENTORY: {
     STOCK_IN: '/inventory/stock-in',
     STOCK_OUT: '/inventory/stock-out',
+    ADJUST_STOCK: '/inventory/adjust-stock',
     TRANSFER: '/inventory/transfer',
     CURRENT_STOCK: '/inventory/current-stock',
   },
@@ -33,5 +34,10 @@ export const API_ENDPOINTS = {
     APPROVE: (id) => `/transfers/requests/${id}/approve`,
     EXECUTE: (id) => `/transfers/requests/${id}/execute`,
     CANCEL: (id) => `/transfers/requests/${id}/cancel`,
+  },
+  CUSTOMERS: {
+    BASE: '/customers',
+    BY_ID: (id) => `/customers/${id}`,
+    BULK_DELETE: '/customers/bulk-delete',
   },
 };

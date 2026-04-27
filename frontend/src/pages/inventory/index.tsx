@@ -56,6 +56,8 @@ const InventoryPage = () => {
         response = await inventoryService.stockOut(formData);
       } else if (actionType === 'TRANSFER') {
         response = await inventoryService.transferStock(formData);
+      } else if (actionType === 'ADJUST') {
+        response = await inventoryService.adjustStock(formData);
       } else {
         toast.error("Action not implemented yet");
         return;

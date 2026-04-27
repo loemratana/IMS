@@ -47,6 +47,15 @@ const transferService = {
   async executeTransfer(id, data = {}) {
     return await axiosClient.post(API_ENDPOINTS.TRANSFERS.EXECUTE(id), data);
   },
+
+  /**
+   * Cancel a transfer request
+   * @param {string|number} id - The ID of the transfer request
+   * @param {object} data - Optional payload (e.g., cancellation notes)
+   */
+  async cancelTransferRequest(id, data = {}) {
+    return await axiosClient.post(API_ENDPOINTS.TRANSFERS.CANCEL(id), data);
+  },
 };
 
 export default transferService;

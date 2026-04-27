@@ -52,7 +52,8 @@ const StockActionDialogs: React.FC<Props> = ({ item, type, open, onOpenChange, o
     reason: '',
     purchaseOrderNo: '',
     unitCost: '',
-    notes: ''
+    notes: '',
+    adjustmentType: 'INCREMENT'
   });
   
   const [productOpen, setProductOpen] = useState(false);
@@ -83,7 +84,8 @@ const StockActionDialogs: React.FC<Props> = ({ item, type, open, onOpenChange, o
         reason: '',
         purchaseOrderNo: '',
         unitCost: '',
-        notes: ''
+        notes: '',
+        adjustmentType: 'INCREMENT'
       });
     }
   }, [open, type, item]);
@@ -118,7 +120,8 @@ const StockActionDialogs: React.FC<Props> = ({ item, type, open, onOpenChange, o
       reason: formData.reason,
       purchaseOrderNo: formData.purchaseOrderNo,
       unitCost: formData.unitCost ? Number(formData.unitCost) : undefined,
-      notes: formData.notes
+      notes: formData.notes,
+      ...(type === 'ADJUST' && { adjustmentType: formData.adjustmentType })
     };
     onSubmit(payload);
   };
@@ -241,6 +244,36 @@ const StockActionDialogs: React.FC<Props> = ({ item, type, open, onOpenChange, o
               </div>
             )}
           </div>
+
+          {type === 'ADJUST' && (
+            <div className="grid gap-2">
+              <Label className="font-bold text-slate-700 dark:text-slate-300">Adjustment Type</Label>
+              <div className="flex gap-4 mt-1">
+                <Button 
+                  type="button"
+                  variant={formData.adjustmentType === 'INCREMENT' ? 'default' : 'outline'}
+                  className={cn(
+                    "flex-1 rounded-xl h-11 border-slate-200 dark:border-slate-800", 
+                    formData.adjustmentType === 'INCREMENT' ? "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent" : "text-slate-600 hover:bg-slate-50"
+                  )}
+                  onClick={() => handleInputChange('adjustmentType', 'INCREMENT')}
+                >
+                  <ArrowUpCircle className="w-4 h-4 mr-2" /> Add Stock
+                </Button>
+                <Button 
+                  type="button"
+                  variant={formData.adjustmentType === 'DECREMENT' ? 'default' : 'outline'}
+                  className={cn(
+                    "flex-1 rounded-xl h-11 border-slate-200 dark:border-slate-800", 
+                    formData.adjustmentType === 'DECREMENT' ? "bg-rose-600 hover:bg-rose-700 text-white border-transparent" : "text-slate-600 hover:bg-slate-50"
+                  )}
+                  onClick={() => handleInputChange('adjustmentType', 'DECREMENT')}
+                >
+                  <ArrowDownCircle className="w-4 h-4 mr-2" /> Deduct Stock
+                </Button>
+              </div>
+            </div>
+          )}
 
           {type === 'IN' && (
             <div className="grid gap-2">

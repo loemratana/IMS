@@ -276,6 +276,105 @@ class InventoryService {
             message: 'Stock transferred successfully'
         };
     }
+
+    /**
+  * Adjust stock (increase or decrease)
+  */
+    async adjustStock(data, userId) {
+        const {
+            warehouseId,
+            productId,
+            quantity,
+            adjustmentType, // 'INCREMENT' or 'DECREMENT'
+            reason,
+            notes
+        } = data;
+
+
+        const result = await prisma.$transaction(async (tx) => {
+            //1.validate  product and warehouse
+            const product = await tx.product.findUnique({ where: { id: productId } });
+            if (!product) throw new Error('PRODUCT_NOT_FOUND');
+
+            const warehouse = await tx.warehouse.findUnique({
+                where: { id: warehouseId }
+            });
+            if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+
+            // 2. Get current stock
+
+            let stock = await tx.stock.findUnique({
+                where: { productId_warehouseId: { productId, warehouseId } }
+            });
+
+            const oldQuantity = stock ? stock.quantity : 0;
+            let newQuantity;
+
+            if (adjustmentType === 'INCREMENT') {
+                newQuantity = oldQuantity + Math.abs(quantity);
+            }
+            else {
+                if (oldQuantity < Math.abs(quantity)) {
+                    throw new Error('INSUFFICIENT_STOCK_FOR_ADJUSTMENT');
+                }
+                newQuantity = oldQuantity - Math.abs(quantity);
+            }
+
+            // 3. Update or create stock
+
+            if (stock) {
+                stock = await tx.stock.update({
+                    where: { id: stock.id },
+                    data: {
+                        quantity: newQuantity,
+                        availableQuantity: newQuantity - stock.reservedQuantity,
+                        updatedAt: new Date()
+                    }
+                });
+            }
+            else {
+                if (adjustmentType === 'DECREMENT') {
+                    throw new Error('CANNOT_DECREMENT_NONEXISTENT_STOCK');
+                }
+
+                stock = await tx.stock.create({
+                    data: {
+                        warehouseId,
+                        productId,
+                        quantity: newQuantity,
+                        minStock: product.minStock || 5,
+                        maxStock: product.maxStock,
+                        reorderPoint: product.reorderPoint || 10
+                    }
+                });
+            }
+            // 4. Record adjustment movement
+            const movement = await tx.stockMovement.create({
+                data: {
+                    warehouseId,
+                    productId,
+                    type: 'ADJUST',
+                    quantity: adjustmentType === 'INCREMENT' ? Math.abs(quantity) : -Math.abs(quantity),
+                    quantityBefore: oldQuantity,
+                    quantityAfter: newQuantity,
+                    reason: `Stock adjustment: ${reason}`,
+                    createdBy: userId
+                }
+            })
+
+            return { stock, movement };
+
+
+        });
+
+        logger.info(`Stock adjusted: ${adjustmentType} ${Math.abs(quantity)} units of product ${productId} in warehouse ${warehouseId}`);
+
+        return {
+            success: true,
+            data: result,
+            message: 'Stock adjusted successfully'
+        };
+    }
     // get current stock levels with filters
     async getCurrentStock(filters = {}) {
         try {

@@ -9,6 +9,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const productRoutes = require("./routes/productRoutes");
 const warehouseRoutes = require("./routes/warehouseRoutes");
 const transferRoutes = require("./routes/transferRoutes");
+const customerRoutes = require("./routes/customerRoutes");
 
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const app = express();
@@ -55,5 +56,6 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/inventory", inventoryRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/transfers", transferRoutes);
+app.use("/api/customers", customerRoutes);
 
 module.exports = app;

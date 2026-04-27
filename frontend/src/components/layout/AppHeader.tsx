@@ -81,21 +81,49 @@ export function AppHeader() {
               </Badge>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-0.5">
-              <span className="text-sm font-medium">Low stock alert</span>
-              <span className="text-xs text-muted-foreground">SKU-2384 below threshold</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-0.5">
-              <span className="text-sm font-medium">PO #4421 approved</span>
-              <span className="text-xs text-muted-foreground">2 minutes ago</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-0.5">
-              <span className="text-sm font-medium">New supplier added</span>
-              <span className="text-xs text-muted-foreground">Acme Logistics</span>
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden border-none shadow-2xl rounded-2xl animate-in zoom-in-95 duration-200">
+            <DropdownMenuLabel className="p-4 bg-indigo-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                <span className="font-black tracking-tight">Notifications</span>
+              </div>
+              <Badge className="bg-white/20 text-white border-none text-[10px] font-bold">3 New</Badge>
+            </DropdownMenuLabel>
+            <div className="max-h-[350px] overflow-y-auto bg-card">
+              <DropdownMenuItem className="p-4 border-b border-border/50 flex flex-col items-start gap-1 cursor-pointer hover:bg-muted/50 focus:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2 w-full">
+                  <Badge className="bg-rose-500 h-2 w-2 rounded-full p-0" />
+                  <span className="text-xs font-bold text-foreground">Critical Stock Alert</span>
+                  <span className="text-[10px] font-medium text-muted-foreground ml-auto">2m ago</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">High-Performance GPU has dropped below the threshold (2 left).</p>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="p-4 border-b border-border/50 flex flex-col items-start gap-1 cursor-pointer hover:bg-muted/50 focus:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2 w-full">
+                  <Badge className="bg-amber-500 h-2 w-2 rounded-full p-0" />
+                  <span className="text-xs font-bold text-foreground">Low Stock Warning</span>
+                  <span className="text-[10px] font-medium text-muted-foreground ml-auto">45m ago</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">Wireless Mouse stock is currently at 12 units.</p>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="p-4 border-b border-border/50 flex flex-col items-start gap-1 cursor-pointer hover:bg-muted/50 focus:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2 w-full">
+                  <Badge className="bg-blue-500 h-2 w-2 rounded-full p-0" />
+                  <span className="text-xs font-bold text-foreground">Daily Report Sent</span>
+                  <span className="text-[10px] font-medium text-muted-foreground ml-auto">8h ago</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">System summary successfully delivered to admin@enterprise.com.</p>
+              </DropdownMenuItem>
+            </div>
+            <div className="p-2 bg-muted/30">
+              <Button 
+                variant="ghost" 
+                className="w-full text-[11px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 py-2 h-auto rounded-xl"
+                onClick={() => navigate('/alerts/notifications')}
+              >
+                View All Activity Logs
+              </Button>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

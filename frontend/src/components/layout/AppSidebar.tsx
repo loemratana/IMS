@@ -12,6 +12,9 @@ import {
   Sparkles,
   Layers,
   Truck,
+  ShieldAlert,
+  Bell,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -46,6 +49,13 @@ const operations = [
 const insights = [
   { title: "Audit Logs", url: "/audit", icon: ScrollText },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+];
+
+const alerts = [
+  { title: "Overview", url: "/alerts", icon: ShieldAlert },
+  { title: "Rule Management", url: "/alerts/rules", icon: Settings },
+  { title: "Notifications", url: "/alerts/notifications", icon: Bell },
+  { title: "Integrations", url: "/alerts/settings", icon: Layers },
 ];
 
 export function AppSidebar() {
@@ -124,6 +134,13 @@ export function AppSidebar() {
           {!collapsed && <SidebarGroupLabel>Insights</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>{insights.map(renderItem)}</SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel>Smart Alerts</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu>{alerts.map(renderItem)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

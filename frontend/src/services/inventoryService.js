@@ -31,6 +31,14 @@ const inventoryService = {
   },
 
   /**
+   * Adjust stock levels (increment or decrement)
+   * @param {object} data - { warehouseId, productId, quantity, adjustmentType, reason, notes }
+   */
+  async adjustStock(data) {
+    return await axiosClient.post(API_ENDPOINTS.INVENTORY.ADJUST_STOCK, data);
+  },
+
+  /**
    * Transfer stock between warehouses
    * @param {object} data - { fromWarehouseId, toWarehouseId, productId, quantity, reason }
    */

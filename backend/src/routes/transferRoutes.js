@@ -11,9 +11,8 @@ const router = express.Router();
 router.use(protect);
 
 // List transfer requests (any authenticated user with appropriate role)
-router.get('/requests', cache('1 minute'),
+router.get('/requests',
     restrictTo('admin', 'manager', 'staff'),
-
     transferController.getAllTransfers
 );
 
@@ -33,6 +32,11 @@ router.post('/requests',
 router.post('/requests/:id/approve',
     restrictTo('admin', 'manager'),
     transferController.approveTransferRequest
+);
+
+router.post('/requests/:id/cancel',
+    restrictTo('admin', 'manager'),
+    transferController.cancelTransferRequest
 );
 
 // Execute transfer (admin/manager only)

@@ -5,6 +5,7 @@ class InventoryController {
         this.stockOut = this.stockOut.bind(this);
         this.transferStock = this.transferStock.bind(this);
         this.getCurrentStock = this.getCurrentStock.bind(this);
+        this.adjustStock = this.adjustStock.bind(this);
         this.handleError = this.handleError.bind(this);
     }
 
@@ -75,6 +76,24 @@ class InventoryController {
         }
     }
 
+    async adjustStock(req, res, next) {
+        try {
+            const result = await inventoryService.adjustStock(req.body, req.user.id)
+            res.json(
+                {
+                    success: true,
+                    data: result.data,
+                    message: result.message
+                }
+            );
+
+
+        }
+        catch (error) {
+            this.handleError(error, res, next);
+        }
+
+    }
     handleError(error, res, next) {
         const errorMap = {
             'PRODUCT_NOT_FOUND': { status: 404, message: 'Product not found' },
@@ -83,7 +102,7 @@ class InventoryController {
             'INSUFFICIENT_STOCK': { status: 400, message: 'Insufficient stock quantity' },
             'SOURCE_STOCK_NOT_FOUND': { status: 404, message: 'Source warehouse has no stock for this product' },
             'SAME_WAREHOUSE_TRANSFER': { status: 400, message: 'Source and destination warehouse must be different' },
-        };
+        }
 
         const mapped = errorMap[error.message];
         if (mapped) {
@@ -94,5 +113,6 @@ class InventoryController {
 
 
 }
+
 
 module.exports = new InventoryController();

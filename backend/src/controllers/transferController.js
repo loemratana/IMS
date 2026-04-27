@@ -8,6 +8,7 @@ class TransferController {
         this.approveTransferRequest = this.approveTransferRequest.bind(this);
         this.executeTransfer = this.executeTransfer.bind(this);
         this.getTransferRequestById = this.getTransferRequestById.bind(this);
+        this.cancelTransferRequest = this.cancelTransferRequest.bind(this);
         this.handleError = this.handleError.bind(this);
     }
 
@@ -53,6 +54,15 @@ class TransferController {
     async executeTransfer(req, res, next) {
         try {
             const result = await transferService.executeTransfer(req.params.id, req.user.id, req.body.executionNotes);
+            res.json(result);
+        } catch (error) {
+            this.handleError(error, res, next);
+        }
+    }
+
+    async cancelTransferRequest(req, res, next) {
+        try {
+            const result = await transferService.cancelTransferRequest(req.params.id, req.user.id);
             res.json(result);
         } catch (error) {
             this.handleError(error, res, next);

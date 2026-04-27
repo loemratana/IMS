@@ -20,6 +20,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { auditMockData } from '../audit/auditMockData';
+import { AuditLogTable } from '@/components/audit/AuditLogTable';
+import { AuditLogDetailDrawer } from '@/components/audit/AuditLogDetailDrawer';
+import { History } from 'lucide-react';
 
 import {
   Product, SheetMode, ProductFormValues, productSchema,
@@ -51,6 +56,9 @@ export function ProductSheet({
   });
 
   const watchedName = form.watch('name');
+
+  const [selectedLog, setSelectedLog] = React.useState<any>(null);
+  const [isLogDrawerOpen, setIsLogDrawerOpen] = React.useState(false);
 
   // Reset form when mode or product changes
   useEffect(() => {
@@ -89,67 +97,102 @@ export function ProductSheet({
 
         {/* ── View Mode ── */}
         {mode === 'view' && product && (
-          <div className="space-y-6">
-            <div className="w-full h-48 rounded-xl bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
-              {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
-              ) : (
-                <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="details" className="font-bold">Details</TabsTrigger>
+              <TabsTrigger value="activity" className="font-bold flex items-center gap-2">
+                <History className="h-3.5 w-3.5" /> Activity
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-6 m-0 animate-in fade-in slide-in-from-left-2 duration-300">
+              <div className="w-full h-48 rounded-xl bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
+                {product.imageUrl ? (
+                  <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Price', value: formatCurrency(product.price), icon: DollarSign },
+                  { label: 'In Stock', value: product.quantity, icon: ShoppingCart },
+                  { label: 'Min Stock', value: product.minStock, icon: AlertTriangle },
+                ].map(({ label, value, icon: Icon }) => (
+                  <div key={label} className="rounded-lg border border-border/40 p-3 text-center">
+                    <Icon className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-lg font-bold">{value}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3 text-sm">
+                {[
+                  { label: 'SKU', value: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</code> },
+                  { label: 'Category', value: product.category?.name || '—' },
+                  { label: 'Supplier', value: product.supplier?.name || '—' },
+                  { label: 'Stock Value', value: formatCurrency(product.stockValue) },
+                  { label: 'Status', value: <StockBadge product={product} /> },
+                  { label: 'Created', value: new Date(product.createdAt).toLocaleDateString() },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex justify-between items-center py-1.5 border-b border-border/20 last:border-0">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {product.description && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Description</p>
+                    <p className="text-sm">{product.description}</p>
+                  </div>
+                </>
               )}
-            </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Price', value: formatCurrency(product.price), icon: DollarSign },
-                { label: 'In Stock', value: product.quantity, icon: ShoppingCart },
-                { label: 'Min Stock', value: product.minStock, icon: AlertTriangle },
-              ].map(({ label, value, icon: Icon }) => (
-                <div key={label} className="rounded-lg border border-border/40 p-3 text-center">
-                  <Icon className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-bold">{value}</p>
-                  <p className="text-xs text-muted-foreground">{label}</p>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => onEdit(product)}>
+                  <Edit2 className="h-4 w-4 mr-1.5" /> Edit
+                </Button>
+                <Button variant="destructive" size="icon" onClick={() => onDelete(product.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="activity" className="m-0 animate-in fade-in slide-in-from-right-2 duration-300">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-foreground">Recent Activity</h4>
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
+                    {auditMockData.filter(l => l.entity === 'PRODUCT' && l.entityId === product.sku).length} Events
+                  </Badge>
                 </div>
-              ))}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3 text-sm">
-              {[
-                { label: 'SKU', value: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</code> },
-                { label: 'Category', value: product.category?.name || '—' },
-                { label: 'Supplier', value: product.supplier?.name || '—' },
-                { label: 'Stock Value', value: formatCurrency(product.stockValue) },
-                { label: 'Status', value: <StockBadge product={product} /> },
-                { label: 'Created', value: new Date(product.createdAt).toLocaleDateString() },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-center py-1.5 border-b border-border/20 last:border-0">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-medium">{value}</span>
+                <div className="-mx-1">
+                  <AuditLogTable 
+                    logs={auditMockData.filter(l => l.entity === 'PRODUCT')} 
+                    onViewDetails={(log) => {
+                      setSelectedLog(log);
+                      setIsLogDrawerOpen(true);
+                    }}
+                  />
                 </div>
-              ))}
-            </div>
-
-            {product.description && (
-              <>
-                <Separator />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Description</p>
-                  <p className="text-sm">{product.description}</p>
-                </div>
-              </>
-            )}
-
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => onEdit(product)}>
-                <Edit2 className="h-4 w-4 mr-1.5" /> Edit
-              </Button>
-              <Button variant="destructive" size="icon" onClick={() => onDelete(product.id)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
+
+        <AuditLogDetailDrawer 
+          log={selectedLog}
+          open={isLogDrawerOpen}
+          onOpenChange={setIsLogDrawerOpen}
+        />
 
         {/* ── Create / Edit Form ── */}
         {(mode === 'create' || mode === 'edit') && (

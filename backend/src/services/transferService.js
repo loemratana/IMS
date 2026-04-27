@@ -152,7 +152,7 @@ class TransferService {
                 performedBy: userId,
                 notes: `Transfer request created for ${quantity} units`,
                 metadata: { quantity, priority, reservationNumber }
-            });
+            }, tx);
 
             await this.recordHistory({
                 transferRequestId: transferRequest.id,
@@ -160,7 +160,7 @@ class TransferService {
                 performedBy: userId,
                 notes: `Stock reservation created: ${reservationNumber}`,
                 metadata: { reservationId: reservation.id, quantity }
-            });
+            }, tx);
 
             logger.info(`Transfer request created: ${requestNumber} by user ${userId}`);
 
@@ -276,7 +276,7 @@ class TransferService {
                 performedBy: userId,
                 notes: approvalNotes || 'Transfer request approved',
                 metadata: { approvedAt: new Date().toISOString() }
-            });
+            }, tx);
 
             logger.info(`Transfer request approved: ${transferRequest.requestNumber} by user ${userId}`);
 
@@ -359,7 +359,7 @@ class TransferService {
 
             const newSourceReserved = sourceStock.reservedQuantity - transfer.quantity;
 
-            await prisma.stock.update({
+            await tx.stock.update({
                 where: { id: sourceStock.id },
                 data: {
                     quantity: newSourceQuantity,
@@ -370,18 +370,15 @@ class TransferService {
 
             // 5. Record OUT movement for source
 
-            await prisma.stockMovement.create({
+            await tx.stockMovement.create({
                 data: {
-                    warehouseId: transfer.fromWarehouseId,
+                    warehouseId: transfer.sourceWarehouseId,
                     productId: transfer.productId,
                     type: 'TRANSFER',
                     quantity: -transfer.quantity,
-                    reason: `Transfer to ${transfer.toWarehouse.code || transfer.toWarehouse.name}`,
+                    reason: `Transfer to ${transfer.targetWarehouse.code || transfer.targetWarehouse.name}`,
                     createdBy: userId,
-                    metadata: {
-                        transferId: transfer.id,
-                        transferNumber: transfer.transferNumber
-                    }
+                    transferId: transfer.id
                 }
             });
 
@@ -392,7 +389,7 @@ class TransferService {
                 where: {
                     productId_warehouseId: {
                         productId: transfer.productId,
-                        warehouseId: transfer.toWarehouseId
+                        warehouseId: transfer.targetWarehouseId
                     }
                 }
             });
@@ -407,9 +404,9 @@ class TransferService {
                 });
             }
             else {
-                targetStock = await prisma.stock.create({
+                targetStock = await tx.stock.create({
                     data: {
-                        warehouseId: transfer.toWarehouseId,
+                        warehouseId: transfer.targetWarehouseId,
                         productId: transfer.productId,
                         quantity: transfer.quantity,
                         reservedQuantity: 0,
@@ -422,64 +419,54 @@ class TransferService {
 
 
             // 7. Record IN movement for target
-            await prisma.stockMovement.create({
+            await tx.stockMovement.create({
                 data: {
-                    warehouseId: transfer.toWarehouseId,
+                    warehouseId: transfer.targetWarehouseId,
                     productId: transfer.productId,
                     type: 'TRANSFER',
                     quantity: transfer.quantity,
-                    reason: `Transfer from ${transfer.fromWarehouse.code || transfer.fromWarehouse.name}`,
+                    reason: `Transfer from ${transfer.sourceWarehouse.code || transfer.sourceWarehouse.name}`,
                     createdBy: userId,
-                    metadata: {
-                        transferId: transfer.id,
-                        transferNumber: transfer.transferNumber
-                    }
+                    transferId: transfer.id
                 }
             });
 
             // 9. Update transfer status to EXECUTED
-            const updatedTransfer = await prisma.stockTransferRequest.update({
-                where: { id: transferId },
+            const updatedTransfer = await tx.transferRequest.update({
+                where: { id: transferRequestId },
                 data: {
                     status: 'EXECUTED',
-                    executedBy: userId,
                     executedAt: new Date(),
-                    executionNotes
                 },
                 include: {
-                    fromWarehouse: true,
-                    toWarehouse: true,
+                    sourceWarehouse: true,
+                    targetWarehouse: true,
                     product: true,
                     requester: {
                         select: { id: true, name: true, email: true }
                     },
                     approver: {
                         select: { id: true, name: true, email: true }
-                    },
-                    executor: {
-                        select: { id: true, name: true, email: true }
                     }
                 }
             });
 
             // 10. Record history
-            await prisma.transferHistoryRecord.create({
-                data: {
-                    transferId: transfer.id,
-                    fromStatus: 'APPROVED',
-                    toStatus: 'EXECUTED',
-                    action: 'EXECUTED',
-                    performedBy: userId,
-                    notes: executionNotes || 'Transfer executed successfully',
-                    metadata: {
-                        executedAt: new Date().toISOString(),
-                        sourceStockBefore: sourceStock.quantity,
-                        sourceStockAfter: newSourceQuantity,
-                        targetStockBefore: targetStock ? targetStock.quantity : 0,
-                        targetStockAfter: targetStock ? targetStock.quantity + transfer.quantity : transfer.quantity
-                    }
+            await this.recordHistory({
+                transferRequestId: transfer.id,
+                fromStatus: 'APPROVED',
+                toStatus: 'EXECUTED',
+                action: 'EXECUTED',
+                performedBy: userId,
+                notes: ExecutionNotes || 'Transfer executed successfully',
+                metadata: {
+                    executedAt: new Date().toISOString(),
+                    sourceStockBefore: sourceStock.quantity,
+                    sourceStockAfter: newSourceQuantity,
+                    targetStockBefore: targetStock ? targetStock.quantity - transfer.quantity : 0,
+                    targetStockAfter: targetStock ? targetStock.quantity : transfer.quantity
                 }
-            });
+            }, tx);
 
             // 11. Check low stock alert for source warehouse
             if (newSourceQuantity <= (sourceStock.minStock || 5)) {
@@ -548,30 +535,27 @@ class TransferService {
                         releasedBy: userId
                     }
                 });
-
-
-                const updatedRequest = await tx.transferRequest.update(
-                    {
-                        where: { id: transferRequestId },
-                        data: {
-                            status: 'CANCELLED'
-
-                        }
-                    }
-                );
-
-                await this.recordHistory({
-                    transferRequestId: transferRequest.id,
-                    action: 'CANCELLED',
-                    fromStatus: 'PENDING',
-                    toStatus: 'CANCELLED',
-                    performedBy: userId,
-                    notes: cancelReason,
-                    metadata: { cancelledAt: new Date().toISOString() }
-                }, tx);
-
-                return updatedRequest;
             }
+
+            // ALWAYS update the transfer request status to CANCELLED
+            const updatedRequest = await tx.transferRequest.update({
+                where: { id: transferRequestId },
+                data: {
+                    status: 'CANCELLED'
+                }
+            });
+
+            await this.recordHistory({
+                transferRequestId: transferRequest.id,
+                action: 'CANCELLED',
+                fromStatus: transferRequest.status,
+                toStatus: 'CANCELLED',
+                performedBy: userId,
+                notes: cancelReason || 'Transfer request cancelled',
+                metadata: { cancelledAt: new Date().toISOString() }
+            }, tx);
+
+            return updatedRequest;
         });
 
         return {

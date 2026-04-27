@@ -69,6 +69,19 @@ export function TransferDrawer({ transfer, open, onOpenChange }: TransferDrawerP
     }
   });
 
+  // Cancel Mutation
+  const cancelMutation = useMutation({
+    mutationFn: () => transferService.cancelTransferRequest(transfer?.id as string),
+    onSuccess: () => {
+      toast.success("Transfer request cancelled!");
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to cancel transfer");
+    }
+  });
+
   // Fetch detailed data
   const { data: detailedTransferData, isLoading } = useQuery({
     queryKey: ['transfer', transfer?.id],
@@ -315,8 +328,13 @@ export function TransferDrawer({ transfer, open, onOpenChange }: TransferDrawerP
                   )}
                 </Button>
               </div>
-              <Button variant="ghost" className="rounded-xl h-10 text-xs font-bold text-muted-foreground hover:text-foreground">
-                Cancel Request
+              <Button 
+                variant="ghost" 
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending}
+                className="rounded-xl h-10 text-xs font-bold text-muted-foreground hover:text-foreground"
+              >
+                {cancelMutation.isPending ? "Cancelling..." : "Cancel Request"}
               </Button>
             </div>
           )}

@@ -4,6 +4,7 @@ const { protect } = require('../middleware/authMiddleware');
 const { restrictTo } = require('../middleware/restrictTo')
 const { validate } = require('../middleware/validationMiddleware');
 const { inventoryValidation } = require('../validators/invtoryValidation');
+const { route } = require('./transferRoutes');
 
 
 const router = express.Router();
@@ -27,10 +28,18 @@ router.post(
     inventoryController.stockOut
 );
 
+router.post(
+    '/adjust-stock',
+    protect,
+    restrictTo('ADMIN', 'MANAGER'),
+    validate(inventoryValidation.adjustStock),
+    inventoryController.adjustStock
+)
+
 router.get(
-    '/current-stock', 
-    protect, 
-    restrictTo('ADMIN', 'MANAGER', 'STAFF'), 
+    '/current-stock',
+    protect,
+    restrictTo('ADMIN', 'MANAGER', 'STAFF'),
     inventoryController.getCurrentStock
 );
 

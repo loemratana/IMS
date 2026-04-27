@@ -431,13 +431,25 @@ model Stock {
 /// ======================
 model Supplier {
   id      String  @id @default(uuid())
+  code    String  @unique
   name    String
   email   String?
   phone   String?
   address String? @db.Text
-  contact String?
 
+  type   SupplierType @default(REGULAR)
+  status PartyStatus  @default(ACTIVE)
+
+  notes String? @db.Text
+
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
   purchases Purchase[]
+
+  @@index([code])
+  @@index([name])
+  @@index([status])
+  @@map("suppliers")
 }
 
 /// ======================
@@ -478,13 +490,25 @@ enum PurchaseStatus {
 /// ======================
 model Customer {
   id      String  @id @default(uuid())
+  code    String  @unique
   name    String
-  email   String?
-  phone   String?
+  email   String? @unique
+  phone   String? @unique
   address String? @db.Text
-  contact String?
 
-  sales Sale[]
+  type   CustomerType @default(RETAIL)
+  status PartyStatus  @default(ACTIVE)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  sales     Sale[]
+
+  @@index([code])
+  @@index([name])
+  @@index([status])
+  @@map("customers")
 }
 
 /// ======================
@@ -524,6 +548,8 @@ model AuditLog {
   id String @id @default(uuid())
 
   action   String
+  entity   String?
+  entityId String?
   oldValue String?
   newValue String?
 
@@ -531,6 +557,24 @@ model AuditLog {
   user   User   @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CustomerType {
+  RETAIL
+  WHOLESALE
+  CORPORATE
+  GOVERNMENT
+}
+
+enum SupplierType {
+  REGULAR
+  PREMIUM
+  STRATEGIC
 }
 
 enum TransferAction {
@@ -546,4 +590,45 @@ enum TransferAction {
   EXECUTION_COMPLETED
   EXECUTION_FAILED
   EXECUTION_RETRIED
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  PENDING
+}
+
+enum NotificationChannel {
+  EMAIL
+  TELEGRAM
+  IN_APP
+}
+
+model AlertRule {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  conditionType String   @default("THRESHOLD")
+  threshold     Int
+  scope         String   @default("ALL")
+  channels      String[]
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  notifications Notification[]
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  title     String
+  message   String
+  type      String              @default("INFO")
+  channel   NotificationChannel
+  status    NotificationStatus  @default(PENDING)
+  entityId  String?
+  createdAt DateTime            @default(now())
+
+  alertRuleId String?
+  alertRule   AlertRule? @relation(fields: [alertRuleId], references: [id])
 }

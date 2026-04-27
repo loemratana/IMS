@@ -20,6 +20,14 @@ import Products from "./pages/products/index";
 import Inventory from "./pages/inventory/index";
 import Transfers from "./pages/inventory/transfers/index";
 import Warehouses from "./pages/warehouses/index";
+import Purchases from "./pages/purchases/index";
+import Sales from "./pages/sales/index";
+import Contacts from "./pages/contacts/index";
+import AuditLogs from "./pages/AuditLogs";
+import AlertsOverview from "./pages/alerts/AlertsOverview";
+import AlertRules from "./pages/alerts/AlertRules";
+import NotificationsPage from "./pages/alerts/NotificationsPage";
+import AlertSettings from "./pages/alerts/AlertSettings";
 
 const queryClient = new QueryClient();
 
@@ -45,10 +53,17 @@ const App = () => (
             <Route path="/warehouses" element={<Warehouses />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/inventory/transfers" element={<Transfers />} />
-            <Route path="/purchases" element={<PagePlaceholder title="Purchases" description="Create and approve purchase orders." />} />
-            <Route path="/sales" element={<PagePlaceholder title="Sales" description="Sales orders and customer transactions." />} />
-            <Route path="/contacts" element={<PagePlaceholder title="Suppliers & Customers" description="Manage your supplier and customer directory." />} />
-            <Route path="/audit" element={<PagePlaceholder title="Audit Logs" description="Full audit trail of every change in the workspace." />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/audit" element={<AuditLogs />} />
+            
+            {/* Smart Alerts */}
+            <Route path="/alerts" element={<AlertsOverview />} />
+            <Route path="/alerts/rules" element={<AlertRules />} />
+            <Route path="/alerts/notifications" element={<NotificationsPage />} />
+            <Route path="/alerts/settings" element={<AlertSettings />} />
+
             <Route path="/reports" element={<PagePlaceholder title="Reports" description="Generate and export inventory and sales reports." />} />
           </Route>
           <Route path="*" element={<NotFound />} />
