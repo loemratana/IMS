@@ -9,25 +9,43 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Truck, CheckCircle2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import purchaseService from '@/services/purchaseService';
 import { PurchaseOrder } from './mockData';
 import { toast } from "sonner";
 
 interface Props {
-  po: PurchaseOrder | null;
+  po: any | null; // Using any for now to match backend response
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function ReceiveItemsModal({ po, open, onOpenChange }: Props) {
   const [receiveData, setReceiveData] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
+
+  const receiveMutation = useMutation({
+    mutationFn: (items: { itemId: string, quantity: number }[]) => 
+      purchaseService.receivePurchaseOrderItems(po.id, items),
+    onSuccess: (res) => {
+      toast.success(res.message || 'Items received successfully');
+      queryClient.invalidateQueries({ queryKey: ['purchase', po.id] });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error?.message || 'Failed to receive items');
+    }
+  });
 
   useEffect(() => {
     if (open && po) {
       // Initialize receive data with 0
       const initial: Record<string, number> = {};
-      po.items.forEach(item => {
-        if (item.quantity > item.receivedQuantity) {
-          initial[item.id] = item.quantity - item.receivedQuantity; // default to receive all remaining
+      (po.items || []).forEach((item: any) => {
+        const remaining = item.quantity - (item.receivedQuantity || 0);
+        if (remaining > 0) {
+          initial[item.id] = remaining; // default to receive all remaining
         }
       });
       setReceiveData(initial);
@@ -38,7 +56,6 @@ export function ReceiveItemsModal({ po, open, onOpenChange }: Props) {
 
   const handleQuantityChange = (id: string, val: string, max: number) => {
     const num = parseInt(val) || 0;
-    // Validate bounds
     if (num < 0) return;
     if (num > max) {
       toast.error(`Cannot receive more than remaining ordered quantity (${max})`);
@@ -49,17 +66,19 @@ export function ReceiveItemsModal({ po, open, onOpenChange }: Props) {
   };
 
   const handleConfirm = () => {
-    const totalReceivedNow = Object.values(receiveData).reduce((a, b) => a + b, 0);
-    if (totalReceivedNow <= 0) {
+    const itemsToReceive = Object.entries(receiveData)
+      .filter(([_, qty]) => qty > 0)
+      .map(([itemId, quantity]) => ({ itemId, quantity }));
+
+    if (itemsToReceive.length === 0) {
       toast.error("Please enter quantity to receive.");
       return;
     }
     
-    toast.success(`${totalReceivedNow} items received successfully!`);
-    onOpenChange(false);
+    receiveMutation.mutate(itemsToReceive);
   };
 
-  const pendingItems = po.items.filter(i => i.quantity > i.receivedQuantity);
+  const pendingItems = (po.items || []).filter((i: any) => i.quantity > (i.receivedQuantity || 0));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,8 +115,8 @@ export function ReceiveItemsModal({ po, open, onOpenChange }: Props) {
               </div>
               
               <div className="p-2 space-y-2">
-                {pendingItems.map(item => {
-                  const pending = item.quantity - item.receivedQuantity;
+                {pendingItems.map((item: any) => {
+                  const pending = item.quantity - (item.receivedQuantity || 0);
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-4 items-center bg-card p-2 rounded-lg border border-border/40">
                       <div className="col-span-5">
@@ -141,10 +160,11 @@ export function ReceiveItemsModal({ po, open, onOpenChange }: Props) {
           </Button>
           <Button 
             onClick={handleConfirm} 
-            disabled={pendingItems.length === 0}
+            disabled={pendingItems.length === 0 || receiveMutation.isPending}
             className="h-11 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md gap-2"
           >
-            <CheckCircle2 className="h-4 w-4" /> Confirm Receipt
+            {receiveMutation.isPending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <CheckCircle2 className="h-4 w-4" />}
+            Confirm Receipt
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -94,7 +94,7 @@ const ProductsPage = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ProductFormValues }) =>
+    mutationFn: ({ id, data }: { id: string; data: ProductFormValues }) =>
       productService.updateProduct(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -105,7 +105,7 @@ const ProductsPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => productService.deleteProduct(id),
+    mutationFn: (id: string) => productService.deleteProduct(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product deleted');

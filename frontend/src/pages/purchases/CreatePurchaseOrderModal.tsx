@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, ShoppingCart, Calendar, MapPin, Building2 } from 'lucide-react';
-import { mockSuppliers } from './mockData';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Select,
   SelectContent,
@@ -19,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import purchaseService from '@/services/purchaseService';
+import supplierService from '@/services/supplierService';
+import warehouseService from '@/services/warehouseService';
+import productService from '@/services/productService';
 import { toast } from "sonner";
 
 interface Props {
@@ -27,12 +31,60 @@ interface Props {
 }
 
 export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
-  const [items, setItems] = useState([{ id: 1, product: '', quantity: 1, unitPrice: 0 }]);
-  const [supplier, setSupplier] = useState('');
-  const [warehouse, setWarehouse] = useState('');
+  const [items, setItems] = useState([{ id: Date.now(), productId: '', quantity: 1, unitPrice: 0 }]);
+  const [supplierId, setSupplierId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [expectedDate, setExpectedDate] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const queryClient = useQueryClient();
+
+  // Queries
+  const { data: suppliersRes } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: () => supplierService.getAllSuppliers(),
+    enabled: open
+  });
+
+  const { data: warehousesRes } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => warehouseService.getAllWarehouses(),
+    enabled: open
+  });
+
+  const { data: productsRes } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => productService.getAllProducts(),
+    enabled: open
+  });
+
+  const suppliers = suppliersRes?.data || [];
+  const warehouses = warehousesRes?.data || [];
+  const products = productsRes?.data || [];
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => purchaseService.createPurchaseOrder(data),
+    onSuccess: () => {
+      toast.success('Purchase Order created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create Purchase Order');
+    }
+  });
+
+  const resetForm = () => {
+    setItems([{ id: Date.now(), productId: '', quantity: 1, unitPrice: 0 }]);
+    setSupplierId('');
+    setWarehouseId('');
+    setExpectedDate('');
+    setNotes('');
+  };
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), product: '', quantity: 1, unitPrice: 0 }]);
+    setItems([...items, { id: Date.now(), productId: '', quantity: 1, unitPrice: 0 }]);
   };
 
   const removeItem = (id: number) => {
@@ -41,29 +93,43 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
   };
 
   const updateItem = (id: number, field: string, value: any) => {
-    setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
+    setItems(items.map(item => {
+      if (item.id === id) {
+        if (field === 'productId') {
+          const prod = products.find((p: any) => p.id === value);
+          return { ...item, productId: value, unitPrice: prod ? parseFloat(prod.price) : 0 };
+        }
+        return { ...item, [field]: value };
+      }
+      return item;
+    }));
   };
 
   const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
-  const handleSubmit = (action: 'DRAFT' | 'SUBMIT') => {
-    if (!supplier || !warehouse) {
+  const handleSubmit = (status: 'DRAFT' | 'PENDING') => {
+    if (!supplierId || !warehouseId) {
       toast.error("Please select a supplier and warehouse.");
       return;
     }
-    if (items.some(i => !i.product || i.quantity <= 0)) {
+    if (items.some(i => !i.productId || i.quantity <= 0)) {
       toast.error("Please fill out all item details correctly.");
       return;
     }
 
-    toast.success(`Purchase Order ${action === 'DRAFT' ? 'saved as draft' : 'submitted for approval'}!`);
-    onOpenChange(false);
-    // Reset form after a slight delay
-    setTimeout(() => {
-      setItems([{ id: 1, product: '', quantity: 1, unitPrice: 0 }]);
-      setSupplier('');
-      setWarehouse('');
-    }, 300);
+    const payload = {
+      supplierId,
+      warehouseId,
+      expectedDate: expectedDate || undefined,
+      notes,
+      items: items.map(({ productId, quantity, unitPrice }) => ({
+        productId,
+        quantity,
+        price: unitPrice
+      }))
+    };
+
+    createMutation.mutate(payload);
   };
 
   return (
@@ -90,12 +156,12 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
 
             <div className="space-y-2">
               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Supplier</Label>
-              <Select value={supplier} onValueChange={setSupplier}>
+              <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger className="w-full h-11 bg-background border-border rounded-xl">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockSuppliers.map(s => (
+                  {suppliers.map((s: any) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -104,14 +170,14 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
 
             <div className="space-y-2">
               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Destination Warehouse</Label>
-              <Select value={warehouse} onValueChange={setWarehouse}>
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
                 <SelectTrigger className="w-full h-11 bg-background border-border rounded-xl">
                   <SelectValue placeholder="Select warehouse" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wh_1">Main Distribution Center</SelectItem>
-                  <SelectItem value="wh_2">West Coast Hub</SelectItem>
-                  <SelectItem value="wh_3">East Coast Hub</SelectItem>
+                  {warehouses.map((w: any) => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -120,7 +186,12 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" /> Expected Delivery Date
               </Label>
-              <Input type="date" className="h-11 bg-background border-border rounded-xl" />
+              <Input 
+                type="date" 
+                className="h-11 bg-background border-border rounded-xl" 
+                value={expectedDate}
+                onChange={(e) => setExpectedDate(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -128,6 +199,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
               <Textarea
                 placeholder="Add any special instructions for the supplier..."
                 className="resize-none h-24 bg-background border-border rounded-xl"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
             </div>
           </div>
@@ -151,12 +224,16 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
                 {items.map((item, index) => (
                   <div key={item.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-5">
-                      <Input
-                        placeholder="Product name or SKU..."
-                        className="h-10 border-border bg-card shadow-sm"
-                        value={item.product}
-                        onChange={(e) => updateItem(item.id, 'product', e.target.value)}
-                      />
+                      <Select value={item.productId} onValueChange={(val) => updateItem(item.id, 'productId', val)}>
+                        <SelectTrigger className="h-10 border-border bg-card shadow-sm">
+                          <SelectValue placeholder="Select product..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p: any) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="col-span-2">
                       <Input
@@ -228,11 +305,21 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: Props) {
             Cancel
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => handleSubmit('DRAFT')} className="h-11 px-6 rounded-xl font-bold bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm">
+            <Button 
+              variant="secondary" 
+              onClick={() => handleSubmit('DRAFT')} 
+              className="h-11 px-6 rounded-xl font-bold bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm"
+              disabled={createMutation.isPending}
+            >
               Save Draft
             </Button>
-            <Button onClick={() => handleSubmit('SUBMIT')} className="h-11 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
-              Submit for Approval
+            <Button 
+              onClick={() => handleSubmit('PENDING')} 
+              className="h-11 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Submit Order
             </Button>
           </div>
         </DialogFooter>

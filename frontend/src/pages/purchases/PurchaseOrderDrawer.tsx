@@ -13,36 +13,73 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, CheckCircle2, XCircle, Truck, FileText, Package, Check, ChevronRight, Activity, Paperclip, Calendar
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import purchaseService from '@/services/purchaseService';
 import { PurchaseOrder, POStatus } from './mockData';
 import { ReceiveItemsModal } from './ReceiveItemsModal';
 import { Progress } from "@/components/ui/progress";
+import { toast } from 'sonner';
 
 interface Props {
-  po: PurchaseOrder | null;
+  poId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
+export function PurchaseOrderDrawer({ poId, open, onOpenChange }: Props) {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  if (!po) return null;
+  const { data: poResponse, isLoading } = useQuery({
+    queryKey: ['purchase', poId],
+    queryFn: () => purchaseService.getPurchaseOrderById(poId!),
+    enabled: !!poId && open,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: () => purchaseService.approvePurchaseOrder(poId!),
+    onSuccess: () => {
+      toast.success('Purchase order approved successfully');
+      queryClient.invalidateQueries({ queryKey: ['purchase', poId] });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to approve purchase order');
+    }
+  });
+
+  const po = poResponse?.data;
+
+  if (!po && !isLoading) return null;
 
   const getStatusBadge = (status: POStatus) => {
     switch (status) {
-      case 'DRAFT': return <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200"><FileText className="h-3 w-3 mr-1" /> Draft</Badge>;
-      case 'PENDING_APPROVAL': return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200"><Clock className="h-3 w-3 mr-1" /> Pending Approval</Badge>;
+      case 'PENDING': return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200"><Clock className="h-3 w-3 mr-1" /> Pending Approval</Badge>;
       case 'APPROVED': return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"><CheckCircle2 className="h-3 w-3 mr-1" /> Approved</Badge>;
       case 'RECEIVING': return <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200"><Truck className="h-3 w-3 mr-1" /> Receiving</Badge>;
       case 'COMPLETED': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
-      case 'CANCELLED': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200"><XCircle className="h-3 w-3 mr-1" /> Cancelled</Badge>;
-      default: return null;
+      case 'REJECTED': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const totalOrdered = po.items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalReceived = po.items.reduce((sum, item) => sum + item.receivedQuantity, 0);
+  const items = po?.items || [];
+  const totalOrdered = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalReceived = items.reduce((sum, item) => sum + (item.receivedQuantity || 0), 0);
   const progressPercent = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
+
+  if (isLoading) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-xl md:max-w-2xl p-6 flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4" />
+          <p className="text-muted-foreground">Loading details...</p>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  if (!po) return null;
 
   return (
     <>
@@ -67,14 +104,15 @@ export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
             <div className="grid grid-cols-2 gap-4 mt-6">
               <div className="bg-background rounded-xl p-3 border border-border/50 shadow-sm flex flex-col">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Supplier</span>
-                <span className="font-semibold text-foreground truncate">{po.supplier.name}</span>
-                <span className="text-xs text-muted-foreground mt-0.5">{po.supplier.contact}</span>
+                <span className="font-semibold text-foreground truncate">{po.supplier?.name || 'N/A'}</span>
+                <span className="text-xs text-muted-foreground mt-0.5">{po.supplier?.email}</span>
               </div>
               <div className="bg-background rounded-xl p-3 border border-border/50 shadow-sm flex flex-col">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Destination</span>
-                <span className="font-semibold text-foreground truncate">{po.warehouse.name}</span>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Status</span>
+                <span className="font-semibold text-foreground truncate">{po.status}</span>
               </div>
             </div>
+
 
             {/* Progress Bar for Receiving */}
             {(po.status === 'APPROVED' || po.status === 'RECEIVING' || po.status === 'COMPLETED') && (
@@ -106,11 +144,11 @@ export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
 
               <div className="flex-1 overflow-y-auto p-6">
                 <TabsContent value="items" className="m-0 space-y-4">
-                  {po.items.map(item => (
+                  {items.map((item: any) => (
                     <div key={item.id} className="bg-background border border-border/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
                       <div>
-                        <h4 className="font-bold text-foreground text-sm">{item.product.name}</h4>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">SKU: {item.product.sku}</p>
+                        <h4 className="font-bold text-foreground text-sm">{item.product?.name || 'Unknown Product'}</h4>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">SKU: {item.product?.sku || 'N/A'}</p>
                       </div>
                       <div className="flex items-center gap-6 text-sm">
                         <div className="flex flex-col items-center">
@@ -119,11 +157,11 @@ export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
                         </div>
                         <div className="flex flex-col items-center">
                           <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Received</span>
-                          <span className="font-bold text-indigo-600">{item.receivedQuantity}</span>
+                          <span className="font-bold text-indigo-600">{item.receivedQuantity || 0}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Total</span>
-                          <span className="font-semibold text-foreground">${(item.quantity * item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Price</span>
+                          <span className="font-semibold text-foreground">${parseFloat(item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
                     </div>
@@ -139,7 +177,7 @@ export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
 
                 <TabsContent value="activity" className="m-0">
                   <div className="space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:ml-5 md:before:-translate-x-px md:before:translate-y-2 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-border before:via-border/50 before:to-transparent">
-                    {po.activityLogs.map((log, index) => (
+                    {(po.activityLogs || []).map((log: any) => (
                       <div key={log.id} className="relative flex items-start gap-4">
                         <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-background border-2 border-border flex items-center justify-center shrink-0 z-10 shadow-sm">
                           <div className="h-2 w-2 md:h-2.5 md:w-2.5 rounded-full bg-indigo-500" />
@@ -176,13 +214,22 @@ export function PurchaseOrderDrawer({ po, open, onOpenChange }: Props) {
               </Button>
             )}
             
-            {po.status === 'PENDING_APPROVAL' && (
+            {po.status === 'PENDING' && (
               <>
-                <Button variant="outline" className="w-full sm:w-auto border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-bold rounded-xl h-11">
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-bold rounded-xl h-11"
+                  onClick={() => {/* Implement reject logic if needed */}}
+                >
                   <XCircle className="h-4 w-4 mr-2" /> Reject
                 </Button>
-                <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md font-bold rounded-xl h-11">
-                  <Check className="h-4 w-4 mr-2" /> Approve Order
+                <Button 
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-md font-bold rounded-xl h-11"
+                  onClick={() => approveMutation.mutate()}
+                  disabled={approveMutation.isPending}
+                >
+                  {approveMutation.isPending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> : <Check className="h-4 w-4 mr-2" />}
+                  Approve Order
                 </Button>
               </>
             )}

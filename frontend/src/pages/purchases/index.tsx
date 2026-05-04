@@ -14,7 +14,9 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { mockPurchaseOrders, PurchaseOrder, POStatus } from './mockData';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import purchaseService from '@/services/purchaseService';
+import { PurchaseOrder, POStatus } from './mockData';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
 import { PurchaseOrderDrawer } from './PurchaseOrderDrawer';
 
@@ -22,23 +24,22 @@ export default function PurchasesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Filter logic
-  const filteredPOs = mockPurchaseOrders.filter(po => {
-    const matchesStatus = activeTab === 'ALL' || po.status === activeTab;
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch =
-      po.poNumber.toLowerCase().includes(searchLower) ||
-      po.supplier.name.toLowerCase().includes(searchLower) ||
-      po.warehouse.name.toLowerCase().includes(searchLower);
-
-    return matchesStatus && matchesSearch;
+  // Queries
+  const { data: purchaseResponse, isLoading } = useQuery({
+    queryKey: ['purchases', { status: activeTab, search: searchQuery }],
+    queryFn: () => purchaseService.getAllPurchaseOrders({ 
+      status: activeTab, 
+      search: searchQuery 
+    }),
   });
 
-  const handlePOClick = (po: PurchaseOrder) => {
-    setSelectedPO(po);
+  const purchaseOrders = purchaseResponse?.data || [];
+
+  const handlePOClick = (id: string) => {
+    setSelectedPOId(id);
     setIsDrawerOpen(true);
   };
 
@@ -46,7 +47,7 @@ export default function PurchasesPage() {
     switch (status) {
       case 'DRAFT':
         return <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20 gap-1 font-medium"><FileText className="h-3 w-3" /> Draft</Badge>;
-      case 'PENDING_APPROVAL':
+      case 'PENDING':
         return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 gap-1 font-medium"><Clock className="h-3 w-3" /> Pending</Badge>;
       case 'APPROVED':
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 gap-1 font-medium"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>;
@@ -121,7 +122,7 @@ export default function PurchasesPage() {
               <TabsList className="bg-muted/80 p-1 h-10 rounded-lg">
                 <TabsTrigger value="ALL" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">All</TabsTrigger>
                 <TabsTrigger value="DRAFT" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Draft</TabsTrigger>
-                <TabsTrigger value="PENDING_APPROVAL" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Pending</TabsTrigger>
+                <TabsTrigger value="PENDING" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Pending</TabsTrigger>
                 <TabsTrigger value="APPROVED" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Approved</TabsTrigger>
                 <TabsTrigger value="RECEIVING" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Receiving</TabsTrigger>
                 <TabsTrigger value="COMPLETED" className="rounded-md px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 font-medium">Completed</TabsTrigger>
@@ -136,11 +137,16 @@ export default function PurchasesPage() {
 
       {/* List Section */}
       <div className="space-y-3 transition-colors">
-        {filteredPOs.length > 0 ? (
-          filteredPOs.map((po) => (
+        {isLoading ? (
+           <div className="flex flex-col items-center justify-center py-24 bg-card rounded-2xl border border-dashed border-border/60">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4" />
+             <p className="text-muted-foreground">Loading purchase orders...</p>
+           </div>
+        ) : purchaseOrders.length > 0 ? (
+          purchaseOrders.map((po) => (
             <Card
               key={po.id}
-              onClick={() => handlePOClick(po)}
+              onClick={() => handlePOClick(po.id)}
               className="border-border/40 shadow-sm hover:shadow-md transition-all duration-300 group bg-card cursor-pointer hover:border-indigo-200 transition-colors"
             >
               <CardContent className="p-0">
@@ -155,11 +161,11 @@ export default function PurchasesPage() {
                         <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md tracking-tight">{po.poNumber}</span>
                         {getStatusBadge(po.status)}
                       </div>
-                      <h3 className="font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors leading-tight">{po.supplier.name}</h3>
+                      <h3 className="font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors leading-tight">{po.supplierName}</h3>
                       <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                         <span className="font-semibold text-foreground/80">{po.itemsCount} items</span>
                         <span className="text-border">•</span>
-                        Dest: {po.warehouse.name}
+                        Dest: {po.warehouse?.name || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -230,7 +236,7 @@ export default function PurchasesPage() {
       />
 
       <PurchaseOrderDrawer
-        po={selectedPO}
+        poId={selectedPOId}
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
       />

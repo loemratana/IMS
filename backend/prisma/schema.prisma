@@ -104,13 +104,14 @@ model Product {
   name        String
   sku         String  @unique
   barcode     String? @unique
-  price       Float
-  description String?
+  price       Decimal @db.Decimal(10, 2)
+  description String? @db.Text
+  stock       Int     @default(0)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  stock         Stock[]
+  stockItems    Stock[]
   movements     StockMovement[]
   saleItems     SaleItem[]
   purchaseItems PurchaseItem[]
@@ -124,6 +125,8 @@ model Product {
   transferRequests  TransferRequest[]
   transfers         Transfer[]
   stockReservations StockReservation[]
+
+  @@map("products")
 }
 
 /// ======================
@@ -182,29 +185,35 @@ model Warehouse {
 model StockMovement {
   id String @id @default(uuid())
 
-  warehouseId String @map("warehouse_id")
-  productId   String @map("product_id")
+  warehouseId String? @map("warehouse_id")
+  productId   String  @map("product_id")
 
   type     StockMovementType
   quantity Int
 
-  reason String? // "purchase", "sale", "adjustment", "damage"
+  referenceId String? @map("reference_id") // Purchase ID, Order ID, etc.
+  referenceNo String? @map("reference_no") // PO Number, SO Number
+  note        String? @db.Text
 
   // Transfer reference (if movement is from transfer)
   transferId String? @map("transfer_id")
 
   // Stock levels before/after
-  quantityBefore Int? @map("quantity_before")
-  quantityAfter  Int? @map("quantity_after")
+  oldStock Int? @map("old_stock")
+  newStock Int? @map("new_stock")
 
   createdBy String?  @map("created_by") // userId
   createdAt DateTime @default(now()) @map("created_at")
 
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  product   Product   @relation(fields: [productId], references: [id])
-  transfer  Transfer? @relation(fields: [transferId], references: [id])
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id])
+  transfer  Transfer?  @relation(fields: [transferId], references: [id])
 
+  @@index([productId])
+  @@index([referenceId])
+  @@index([type])
   @@index([transferId])
+  @@index([createdAt])
   @@map("stock_movements")
 }
 
@@ -442,9 +451,9 @@ model Supplier {
 
   notes String? @db.Text
 
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-  purchases Purchase[]
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  purchases PurchaseOrder[]
 
   @@index([code])
   @@index([name])
@@ -455,34 +464,54 @@ model Supplier {
 /// ======================
 /// PURCHASE (Stock IN)
 /// ======================
-model Purchase {
-  id     String         @id @default(uuid())
-  status PurchaseStatus @default(PENDING)
+model PurchaseOrder {
+  id             String         @id @default(uuid())
+  poNumber       String         @unique @map("po_number")
+  supplierId     String         @map("supplier_id")
+  totalAmount    Decimal        @map("total_amount") @db.Decimal(15, 2)
+  status         PurchaseStatus @default(PENDING)
+  expectedDate   DateTime?      @map("expected_date")
+  approvedAt     DateTime?      @map("approved_at")
+  approvedBy     String?        @map("approved_by")
+  rejectedAt     DateTime?      @map("rejected_at")
+  rejectedBy     String?        @map("rejected_by")
+  rejectedReason String?        @map("rejected_reason") @db.Text
+  notes          String?        @db.Text
 
-  supplierId String
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  items PurchaseItem[]
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  items    PurchaseItem[]
 
-  createdAt DateTime @default(now())
+  @@index([poNumber])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
 }
 
 model PurchaseItem {
-  id       String @id @default(uuid())
-  quantity Int
-  price    Float
+  id         String  @id @default(uuid())
+  purchaseId String  @map("purchase_id")
+  productId  String  @map("product_id")
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(15, 2)
 
-  purchaseId String
-  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+  purchase PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product       @relation(fields: [productId], references: [id])
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  @@map("purchase_items")
 }
 
 enum PurchaseStatus {
   PENDING
   APPROVED
+  RECEIVING
+  COMPLETED
   REJECTED
+  CANCELLED
 }
 
 /// ======================

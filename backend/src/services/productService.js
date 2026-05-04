@@ -286,11 +286,11 @@ class ProductService {
                 data,
                 include: {
                     category: { select: { id: true, name: true } },
-                    stock: { select: { quantity: true } }
+                    stockItems: { select: { quantity: true } }
                 }
             });
 
-            const totalQuantity = product.stock.reduce((sum, s) => sum + s.quantity, 0);
+            const totalQuantity = (product.stockItems || []).reduce((sum, s) => sum + s.quantity, 0);
 
             logger.info(`Product updated: ${product.name} (ID: ${id})`);
 

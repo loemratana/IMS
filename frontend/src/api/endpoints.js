@@ -40,4 +40,16 @@ export const API_ENDPOINTS = {
     BY_ID: (id) => `/customers/${id}`,
     BULK_DELETE: '/customers/bulk-delete',
   },
+  PURCHASES: {
+    BASE: '/purchases',
+    BY_ID: (id) => `/purchases/${id}`,
+    APPROVE: (id) => `/purchases/${id}/approve`,
+    REJECT: (id) => `/purchases/${id}/reject`,
+    RECEIVE: (id) => `/purchases/${id}/receive`,
+  },
+  SUPPLIERS: {
+    BASE: '/suppliers',
+    BY_ID: (id) => `/suppliers/${id}`,
+    PERMANENT: (id) => `/suppliers/${id}/permanent`,
+  },
 };
